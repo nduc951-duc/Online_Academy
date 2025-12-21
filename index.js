@@ -24,6 +24,7 @@ import categoryRoute from "./src/routes/category.route.js";
 import enrollmentRoute from "./src/routes/enrollment.route.js";
 import feedbackRoute from "./src/routes/feedback.route.js";
 import instructorRoute from "./src/routes/instructor.route.js";
+import helmet from "helmet";
 
 
 
@@ -32,6 +33,11 @@ import instructorRoute from "./src/routes/instructor.route.js";
 // ==========================
 dotenv.config();
 const app = express();
+
+app.use(helmet({
+  contentSecurityPolicy: false, // Tạm tắt CSP để không bị lỗi script/style inline
+  crossOriginEmbedderPolicy: false,
+}));
 
 // Lấy đường dẫn tuyệt đối hiện tại (dùng nếu cần path chính xác)
 const __filename = fileURLToPath(import.meta.url);
