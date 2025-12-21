@@ -98,7 +98,7 @@ router.post("/signin", async (req, res) => {
             err_message: "Invalid email or password.",
         });
     }
-    const rs = await bcrypt.compareSync(password, user.password);
+    const rs = await bcrypt.compare(password, user.password);
     if (rs === false) {
         return res.render("vwaccount/signin", {
             layout: "account",
@@ -116,29 +116,7 @@ router.post("/signin", async (req, res) => {
     const url = "/";
     res.redirect(url);
 });
-// router.post('/signin', (req, res, next) => {
-//   passport.authenticate('local', (err, user, info) => {
-//     if (err) {
-//       console.error('❌ Lỗi khi authenticate:', err);
-//       return next(err);
-//     }
-//     if (!user) {
-//       console.warn('⚠️ Login thất bại:', info);
-//       return res.render('vwaccount/signin', {
-//         layout: 'account',
-//         err_message: info?.message || 'Sai thông tin đăng nhập.',
-//       });
-//     }
-//     req.logIn(user, (err) => {
-//       if (err) {
-//         console.error('❌ Lỗi khi logIn:', err);
-//         return next(err);
-//       }
-//       console.log('✅ Đăng nhập thành công:', user);
-//       return res.redirect('/');
-//     });
-//   })(req, res, next);
-// });
+
 router.get('/google',
     passport.authenticate('google', { scope: ['profile', 'email'] })
 );
@@ -214,7 +192,7 @@ router.post("/profile/changepassword", async (req, res) => {
     const currentPassword = req.body.currentPassword;
     const newPassword = req.body.newPassword;
     const user = await accountModel.findUserById(userId);
-    const isMatch = await bcrypt.compareSync(currentPassword, user.password);
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
         return res.json({ success: false, err_message: "Current password is incorrect." });
     }
