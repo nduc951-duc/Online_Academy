@@ -255,47 +255,75 @@ router.get("/profile", (req, res) => {
     } else { res.render("vwaccount/profile", { layout: "account" }); }
 });
 
-router.post("/profile/changeprofile", async (req, res) => {
-    // Áp dụng escape cho name ở đây cũng tốt, nhưng nếu lười thì thôi
-    const userId = req.session.authUser.id;
-    const name = req.body.name;
-    const email = req.body.email;
-    console.log(req.body);
-    if (email !== req.session.authUser.email || name !== req.session.authUser.name) {
-        const isAvailable = await accountModel.isEmailAvailable(email);
-        if (!isAvailable && email !== req.session.authUser.email) {
-            return res.json({ success: false, err_message: "Email is already in use." });
-        } else {
-            const result = await accountModel.updateProfile(userId, name, email);
-            if (result) {
-                console.log("Profile updated successfully.");
-                req.session.authUser.name = name;
-                req.session.authUser.email = email;
-                res.json({ success: true, err_message: "Profile updated successfully." });
-            }
+router.post("/profile/changeprofile", 
+    [
+        // Validate tên: Không rỗng, cắt khoảng trắng, KHỬ MÃ ĐỘC (escape)
+        body('name').notEmpty().withMessage('Họ tên không được để trống').trim().escape(),
+        // Validate email
+        body('email').isEmail().withMessage('Email không hợp lệ').normalizeEmail()
+    ],
+    async (req, res) => {
+        // 1. Kiểm tra lỗi validation
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            // Nếu lỗi, trả về JSON để frontend hiển thị (vì code của bạn đang dùng AJAX/Fetch)
+            return res.json({ success: false, err_message: errors.array()[0].msg });
         }
-    } else {
-        res.json({ success: false, err_message: "No changes made to profile." });
-    }
-});
 
-router.post("/profile/changepassword", async (req, res) => {
-    const userId = req.session.authUser.id;
-    const currentPassword = req.body.currentPassword;
-    const newPassword = req.body.newPassword;
-    const user = await accountModel.findUserById(userId);
-    
-    // Sử dụng await bcrypt.compare (Async) - Đã chuẩn
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    
-    if (!isMatch) {
-        return res.json({ success: false, err_message: "Current password is incorrect." });
+        // 2. Logic cũ giữ nguyên
+        const userId = req.session.authUser.id;
+        const name = req.body.name; // Tên đã được escape an toàn
+        const email = req.body.email;
+        
+        if (email !== req.session.authUser.email || name !== req.session.authUser.name) {
+            const isAvailable = await accountModel.isEmailAvailable(email);
+            if (!isAvailable && email !== req.session.authUser.email) {
+                return res.json({ success: false, err_message: "Email is already in use." });
+            } else {
+                const result = await accountModel.updateProfile(userId, name, email);
+                if (result) {
+                    req.session.authUser.name = name;
+                    req.session.authUser.email = email;
+                    res.json({ success: true, err_message: "Profile updated successfully." });
+                }
+            }
+        } else {
+            res.json({ success: false, err_message: "No changes made to profile." });
+        }
     }
-    const hash = await bcrypt.hash(newPassword, 10);
-    const result = await accountModel.updatePassword(userId, hash);
-    if (result) {
-        res.json({ success: true, err_message: "Password changed successfully." });
+);
+
+router.post("/profile/changepassword", 
+    [
+        body('newPassword').isLength({ min: 6 }).withMessage('Mật khẩu mới phải từ 6 ký tự trở lên')
+    ],
+    async (req, res) => {
+        // 1. Kiểm tra lỗi validation
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.json({ success: false, err_message: errors.array()[0].msg });
+        }
+
+        // 2. Logic cũ giữ nguyên
+        const userId = req.session.authUser.id;
+        const currentPassword = req.body.currentPassword;
+        const newPassword = req.body.newPassword;
+        
+        const user = await accountModel.findUserById(userId);
+        
+        // Dùng await bcrypt.compare (Async) -> Cái này bạn đã sửa rồi, rất tốt!
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        
+        if (!isMatch) {
+            return res.json({ success: false, err_message: "Current password is incorrect." });
+        }
+        
+        const hash = await bcrypt.hash(newPassword, 10);
+        const result = await accountModel.updatePassword(userId, hash);
+        if (result) {
+            res.json({ success: true, err_message: "Password changed successfully." });
+        }
     }
-});
+);
 
 export default router;
