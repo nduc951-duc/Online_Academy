@@ -111,6 +111,16 @@ export default {
         }
     },
 
+    // src/models/course.model.js
+    // Thêm vào object export default
+    async isCourseOwner(courseId, instructorId) {
+        const course = await db("courses")
+            .where("course_id", courseId)
+            .andWhere("instructor_id", instructorId)
+            .first();
+        return !!course; // Trả về true nếu tìm thấy
+    },
+
     // Lấy thông tin video chi tiết
     async getVideoById(videoId) {
         try {
@@ -275,44 +285,48 @@ export default {
      * Gỡ bỏ một khóa học (Yêu cầu 4.2)
      * Phải xóa dữ liệu ở các bảng con trước vì có RÀNG BUỘC KHÓA NGOẠI
      */
+    // src/models/course.model.js
+
     async delete(id) {
-        try {
-            // 1. Xóa feedback
-            await db('feedback').where('course', id).del();
+        // Bắt đầu Transaction
+        return db.transaction(async (trx) => {
+            try {
+                // Lưu ý: Thay 'db' bằng 'trx' trong toàn bộ khối này
+                
+                // 1. Xóa feedback
+                await trx('feedback').where('course', id).del();
 
-            // 2. Xóa enrollment (đăng ký học)
-            await db('enrollment').where('course_id', id).del();
+                // 2. Xóa enrollment
+                await trx('enrollment').where('course_id', id).del();
 
-            // 3. Xóa watchlist (yêu thích)
-            await db('watchlist_course').where('course_id', id).del();
+                // 3. Xóa watchlist
+                await trx('watchlist_course').where('course_id', id).del();
 
-            // 4. Xóa lectures và các video/process liên quan (cascade)
-            const lectures = await db('lecture').where('course_id', id).select('id');
-            const lectureIds = lectures.map(l => l.id);
+                // 4. Xóa lectures và video liên quan
+                const lectures = await trx('lecture').where('course_id', id).select('id');
+                const lectureIds = lectures.map(l => l.id);
 
-            if (lectureIds.length > 0) {
-                // 4a. Get all video IDs
-                const videos = await db('video').whereIn('lecture_id', lectureIds).select('id');
-                const videoIds = videos.map(v => v.id);
+                if (lectureIds.length > 0) {
+                    const videos = await trx('video').whereIn('lecture_id', lectureIds).select('id');
+                    const videoIds = videos.map(v => v.id);
 
-                if (videoIds.length > 0) {
-                    // 4b. Delete video_process
-                    await db('video_process').whereIn('video_id', videoIds).del();
-                    // 4c. Delete videos
-                    await db('video').whereIn('id', videoIds).del();
+                    if (videoIds.length > 0) {
+                        await trx('video_process').whereIn('video_id', videoIds).del();
+                        await trx('video').whereIn('id', videoIds).del();
+                    }
+                    await trx('lecture').whereIn('id', lectureIds).del();
                 }
-                // 4d. Delete lectures
-                await db('lecture').whereIn('id', lectureIds).del();
+
+                // 5. Xóa khóa học
+                const result = await trx('courses').where('course_id', id).del();
+
+                return result > 0; // Trả về true nếu xóa thành công
+            } catch (error) {
+                console.error("Lỗi transaction khi xóa khóa học:", error);
+                // Nếu có lỗi, Knex tự động Rollback (khôi phục dữ liệu cũ)
+                throw error; 
             }
-
-            // 5. Cuối cùng, xóa khóa học
-            await db('courses').where('course_id', id).del();
-
-            return true; // Trả về true nếu thành công
-        } catch (error) {
-            console.error("Lỗi khi xóa khóa học:", error);
-            return false; // Trả về false nếu thất bại
-        }
+        });
     },
 
     async countAll() {

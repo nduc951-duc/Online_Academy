@@ -1,8 +1,29 @@
 import express from "express";
 import instructorController from "../controller/instructor.controller.js";
-import { createCourseImageUpload, handleUploadErrors } from "../utils/upload.js";
+import { createCourseImageUpload, handleUploadErrors } from "../utils/upload.js";\
+import courseModel from "../models/course.model.js"; // Nhớ import model
 
 const router = express.Router();
+
+
+// Middleware kiểm tra chủ sở hữu
+const isCourseOwner = async (req, res, next) => {
+    const courseId = req.params.id || req.body.courseId; // Lấy ID từ URL hoặc Body
+    const instructorId = req.session.authUser.id;
+
+    if (!courseId) return next(); // Nếu không có ID thì bỏ qua (cho route create)
+
+    const isOwner = await courseModel.isCourseOwner(courseId, instructorId);
+    if (isOwner) {
+        return next();
+    }
+    
+    // Nếu không phải chủ sở hữu -> Chặn
+    return res.status(403).render('error', { 
+        layout: false, 
+        message: 'Bạn không có quyền chỉnh sửa khóa học này!' 
+    });
+};
 
 // Middleware to check if user is instructor
 const isInstructor = (req, res, next) => {
@@ -20,8 +41,8 @@ router.get('/', instructorController.dashboard);
 // Course management routes
 router.get('/courses/create', instructorController.showCreateCourse);
 router.post('/courses/create', instructorController.createCourse);
-router.get('/courses/:id/edit', instructorController.showEditCourse);
-router.post('/courses/:id/edit', handleUploadErrors, instructorController.updateCourse);
+router.get('/courses/:id/edit', isCourseOwner, instructorController.showEditCourse);
+router.post('/courses/:id/edit', handleUploadErrors, isCourseOwner, instructorController.updateCourse);
 
 // Lecture management routes
 router.post('/courses/:id/lectures', instructorController.addLecture);
