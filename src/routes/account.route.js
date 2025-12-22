@@ -3,34 +3,76 @@ import accountModel from "../models/accout.model.js";
 import bcrypt from "bcrypt";
 import mailer from "../utils/mailer.js";
 import passport from "../config/passport.js";
+import { body, validationResult } from 'express-validator';
+
+
 const router = express.Router();
 router.get("/signup", async (req, res) => {
     res.render("vwaccount/signup", { layout: "account" });
 });
-router.post("/signup", async (req, res) => {
-    const email = req.body.email;
-    const password = req.body.password;
-    const name = req.body.name;
-    const hash = await bcrypt.hash(password, 10);
+router.post("/signup", 
+    // --- BẮT ĐẦU PHẦN KIỂM TRA DỮ LIỆU (VALIDATION RULES) ---
+    [
+        // Kiểm tra tên: không rỗng, cắt khoảng trắng, khử mã độc HTML (escape)
+        body('name')
+            .notEmpty().withMessage('Họ tên không được để trống')
+            .trim()
+            .escape(),
+        
+        // Kiểm tra email: phải đúng định dạng email, chuẩn hóa về chữ thường
+        body('email')
+            .isEmail().withMessage('Email không hợp lệ')
+            .normalizeEmail(),
+        
+        // Kiểm tra mật khẩu: độ dài tối thiểu 6 ký tự
+        body('password')
+            .isLength({ min: 6 }).withMessage('Mật khẩu phải từ 6 ký tự trở lên')
+    ],
+    //KẾT THÚC PHẦN RULE
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const result = {
-        email: email,
-        password: hash,
-        name: name,
-        otp: otp,
-        otpCreatedAt: Date.now()
+    async (req, res) => {
+        // 3. KIỂM TRA KẾT QUẢ VALIDATION
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            // Nếu có lỗi, quay lại trang đăng ký và báo lỗi ngay lập tức
+            return res.render("vwaccount/signup", {
+                layout: "account",
+                err_message: errors.array()[0].msg // Lấy lỗi đầu tiên để hiển thị
+            });
+        }
+
+        // NẾU DỮ LIỆU HỢP LỆ THÌ CHẠY TIẾP
+        const email = req.body.email;
+        const password = req.body.password;
+        const name = req.body.name; 
+        
+        // Hash mật khẩu
+        const hash = await bcrypt.hash(password, 10);
+
+        // Tạo OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+        const result = {
+            email: email,
+            password: hash,
+            name: name,
+            otp: otp,
+            otpCreatedAt: Date.now()
+        }
+
+        const sendotp = await mailer.sendOTP(email, otp);
+        if (!sendotp.success) {
+            return res.render("vwaccount/signup", {
+                layout: "account",
+                err_message: "Không thể gửi email OTP. Vui lòng thử lại."
+            });
+        } else {
+            req.session.otpStore = result;
+            res.redirect("/account/verify-otp");
+        }
     }
-    const sendotp = await mailer.sendOTP(email, otp);
-    if (!sendotp.success) {
-        return res.render("vwaccount/signup", {
-            layout: "account",
-        });
-    } else {
-        req.session.otpStore = result;
-        res.redirect("/account/verify-otp");
-    }
-});
+);
+
 router.post("/resend-otp", async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const email = req.body.email;
