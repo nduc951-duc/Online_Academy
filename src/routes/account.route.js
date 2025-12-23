@@ -112,7 +112,7 @@ router.get("/verify-otp", async (req, res) => {
 });
 
 router.post("/verify-otp", async (req, res) => {
-    console.log(req.body);
+    //console.log(req.body);
     const enteredOtp = req.body.otp;
     const email = req.body.email;
     const otpStore = req.session.otpStore;
@@ -221,7 +221,8 @@ router.get('/google/callback',
         failureRedirect: '/account/login?error=login+google+failed'
     }),
     (req, res) => {
-        console.log('✅ Đăng nhập Google thành công:', req.user);
+        //console.log('✅ Đăng nhập Google thành công:', req.user);
+        const userId = req.session.authUser.id;
         req.session.isAuthenticated = true;
         req.session.authUser = req.user;
         if (req.user.password == null) {
