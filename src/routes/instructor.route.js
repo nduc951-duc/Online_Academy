@@ -1,6 +1,6 @@
 import express from "express";
 import instructorController from "../controller/instructor.controller.js";
-import { createCourseImageUpload, handleUploadErrors } from "../utils/upload.js";\
+import { createCourseImageUpload, handleUploadErrors } from "../utils/upload.js";
 import courseModel from "../models/course.model.js"; // Nhớ import model
 
 const router = express.Router();

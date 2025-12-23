@@ -296,6 +296,7 @@ export default {
                 // 1. Xóa feedback
                 await trx('feedback').where('course', id).del();
 
+
                 // 2. Xóa enrollment
                 await trx('enrollment').where('course_id', id).del();
 
