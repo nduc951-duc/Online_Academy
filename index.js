@@ -34,8 +34,21 @@ import helmet from "helmet";
 dotenv.config();
 const app = express();
 
+// Cấu hình CSP cho phép load tài nguyên từ các nguồn phổ biến (CDN)
 app.use(helmet({
-  contentSecurityPolicy: false, // Tạm tắt CSP để không bị lỗi script/style inline
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      // Cho phép script inline (cần thiết cho project này) và các CDN phổ biến
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://code.jquery.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://kit.fontawesome.com"],
+      // Cho phép style inline và CDN font/css
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+      // Cho phép load ảnh từ mọi nguồn (vì ảnh khóa học có thể từ internet)
+      imgSrc: ["'self'", "data:", "https:"],
+      // Cho phép load font
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+    },
+  },
   crossOriginEmbedderPolicy: false,
 }));
 
